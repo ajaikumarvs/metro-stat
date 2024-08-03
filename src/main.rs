@@ -7,13 +7,16 @@ use iced::{
 use rand::Rng;
 use std::time::{Duration, Instant};
 
-// Define a struct for the application
 struct MetroApp {
     stations: Vec<Station>,
     current_station_index: usize,
     start_time: Instant,
     last_blink_time: Instant,
     is_blinking: bool,
+    is_rerouting: bool,
+    terminal_waiting: bool,
+    rerouting_message: bool,
+    countdown_to_reroute: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -74,6 +77,10 @@ impl Application for MetroApp {
                 start_time: Instant::now(),
                 last_blink_time: Instant::now(),
                 is_blinking: false,
+                is_rerouting: false,
+                terminal_waiting: false,
+                rerouting_message: false,
+                countdown_to_reroute: false,
             },
             Command::none(),
         )
@@ -86,29 +93,60 @@ impl Application for MetroApp {
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
             Message::Tick => {
-                let current_station = &self.stations[self.current_station_index];
                 let elapsed_time = Instant::now().duration_since(self.start_time);
 
-                if elapsed_time >= Duration::from_secs(current_station.time_to_next as u64) {
-                    if self.current_station_index < self.stations.len() - 1 {
-                        self.current_station_index += 1;
+                if self.terminal_waiting {
+                    if elapsed_time >= Duration::from_secs(5) {
+                        self.terminal_waiting = false;
+                        self.rerouting_message = true;
                         self.start_time = Instant::now();
                     }
-                }
+                } else if self.rerouting_message {
+                    if elapsed_time >= Duration::from_secs(4) {
+                        self.rerouting_message = false;
+                        self.countdown_to_reroute = true;
+                        self.start_time = Instant::now();
+                    }
+                } else if self.countdown_to_reroute {
+                    if elapsed_time >= Duration::from_secs(4) {
+                        self.countdown_to_reroute = false;
+                        self.is_rerouting = true;
+                        self.start_time = Instant::now();
+                    }
+                } else {
+                    let current_station = &self.stations[self.current_station_index];
+                    if elapsed_time >= Duration::from_secs(current_station.time_to_next as u64) {
+                        if self.is_rerouting {
+                            if self.current_station_index > 0 {
+                                self.current_station_index -= 1;
+                                self.start_time = Instant::now();
+                            }
+                            if self.current_station_index == 0 {
+                                self.is_rerouting = false;
+                            }
+                        } else if self.current_station_index < self.stations.len() - 1 {
+                            self.current_station_index += 1;
+                            self.start_time = Instant::now();
+                            if self.current_station_index == self.stations.len() - 1 {
+                                self.terminal_waiting = true;
+                            }
+                        }
+                    }
 
-                // Determine if blinking should occur and update blinking state
-                if self.current_station_index < self.stations.len() - 1 {
-                    let time_left = self.stations[self.current_station_index].time_to_next as i64 - elapsed_time.as_secs() as i64;
-                    if time_left <= 2 {
-                        if Instant::now().duration_since(self.last_blink_time) >= Duration::from_millis(250) {
-                            self.is_blinking = !self.is_blinking;
-                            self.last_blink_time = Instant::now();
+                    // Determine if blinking should occur and update blinking state
+                    if !self.is_rerouting && self.current_station_index < self.stations.len() - 1 {
+                        let time_left = self.stations[self.current_station_index].time_to_next as i64 - elapsed_time.as_secs() as i64;
+                        if time_left <= 2 {
+                            if Instant::now().duration_since(self.last_blink_time) >= Duration::from_millis(250) {
+                                self.is_blinking = !self.is_blinking;
+                                self.last_blink_time = Instant::now();
+                            }
+                        } else {
+                            self.is_blinking = false;
                         }
                     } else {
                         self.is_blinking = false;
                     }
-                } else {
-                    self.is_blinking = false;
                 }
             }
         }
@@ -123,8 +161,7 @@ impl Application for MetroApp {
 
         for (index, station) in self.stations.iter().enumerate() {
             let color = if index == self.current_station_index {
-                // Make the circle blink red and green rapidly if under 2 seconds
-                if self.current_station_index < self.stations.len() - 1 {
+                if !self.is_rerouting && self.current_station_index < self.stations.len() - 1 {
                     if self.is_blinking {
                         if Instant::now().duration_since(self.last_blink_time) < Duration::from_millis(125) {
                             Color::from_rgb(1.0, 0.0, 0.0) // Red
@@ -134,6 +171,8 @@ impl Application for MetroApp {
                     } else {
                         Color::from_rgb(0.0, 1.0, 0.0) // Normal color (green)
                     }
+                } else if self.is_rerouting {
+                    Color::from_rgb(0.0, 0.0, 1.0) // Rerouting color (blue)
                 } else {
                     Color::from_rgb(0.0, 1.0, 0.0) // Normal color (green)
                 }
@@ -167,11 +206,28 @@ impl Application for MetroApp {
             }
         }
 
-        let eta_text = if self.current_station_index < self.stations.len() - 1 {
+        let eta_text = if self.terminal_waiting {
+            "Arrived at Terminal. Rerouting in 5 seconds...".to_string()
+        } else if self.rerouting_message {
+            "Next destination: Sunset Boulevard in 4 seconds...".to_string()
+        } else if self.countdown_to_reroute {
+            let time_left = 4 - Instant::now().duration_since(self.start_time).as_secs() as i64;
+            format!("Countdown: {} seconds...", time_left.max(0))
+        } else if self.is_rerouting && self.current_station_index < self.stations.len() - 1 {
             let time_left = self.stations[self.current_station_index].time_to_next as i64 - Instant::now().duration_since(self.start_time).as_secs() as i64;
             let eta_message = format!("ETA to next station: {} seconds", time_left.max(0));
 
-            if time_left <= 2 {
+            let next_station_name = if self.current_station_index > 0 {
+                self.stations[self.current_station_index - 1].name.clone()
+            } else {
+                "N/A".to_string()
+            };
+            format!("{} - Heading to {}", eta_message, next_station_name)
+        } else if self.current_station_index < self.stations.len() - 1 {
+            let time_left = self.stations[self.current_station_index].time_to_next as i64 - Instant::now().duration_since(self.start_time).as_secs() as i64;
+            let eta_message = format!("ETA to next station: {} seconds", time_left.max(0));
+
+            if time_left <= 2 && !self.is_rerouting {
                 let next_station_name = self.stations[self.current_station_index + 1].name.clone();
                 format!("{} - Arriving soon at {}", eta_message, next_station_name)
             } else {
