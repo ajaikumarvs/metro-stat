@@ -22,20 +22,23 @@ jobs:
     - name: Install dependencies
       run: cargo build --release
 
-    - name: Install screenshot tool
-      run: sudo apt-get install -y x11-apps imagemagick
+    - name: Install tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y x11-apps xvfb imagemagick
 
     - name: Run GUI app and take screenshot
       run: |
+        # Start a virtual display with Xvfb
+        Xvfb :99 -screen 0 1280x720x24 &
+        export DISPLAY=:99
+
+        # Run the Rust application in the background
         nohup cargo run --release &
         sleep 10 # Give the app some time to start
-        import -window root assets/screenshot.png # Adjust the command to capture the GUI window as needed
 
-    - name: Check updated files
-      run: |
-        ls -l assets
-        cat assets/screenshot.png
-        cat README.md
+        # Capture the screenshot
+        import -window root assets/screenshot.png
 
     - name: Update README with the new screenshot
       run: |
