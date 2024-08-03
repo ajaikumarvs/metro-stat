@@ -1373,6 +1373,7 @@ name = "metro-stat"
 version = "0.1.0"
 dependencies = [
  "iced",
+ "rand",
 ]
 
 [[package]]
