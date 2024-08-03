@@ -31,6 +31,12 @@ jobs:
         sleep 10 # Give the app some time to start
         import -window root assets/screenshot.png # Adjust the command to capture the GUI window as needed
 
+    - name: Check updated files
+      run: |
+        ls -l assets
+        cat assets/screenshot.png
+        cat README.md
+
     - name: Update README with the new screenshot
       run: |
         git config --global user.name 'github-actions'
@@ -52,5 +58,7 @@ jobs:
         
         # Commit and push changes
         git add README.md
+        git status
+        git diff --cached
         git commit -m 'Update README with new screenshot'
         git push
