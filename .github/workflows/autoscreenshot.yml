@@ -31,21 +31,34 @@ jobs:
 
         import -window root assets/screenshot.png
 
-    - name: Update README with the new screenshot
+    - name: Verify Screenshot
       run: |
-        git config --global user.name 'github-actions'
-        git config --global user.email 'actions@github.com'
-        
-        mkdir -p assets
-        
+        ls -l assets/
+        file assets/screenshot.png
+
+    - name: Ensure assets directory
+      run: mkdir -p assets
+
+    - name: Display README content
+      run: cat README.md
+
+    - name: Remove old screenshot line
+      run: |
         if grep -q 'screenshot.png' README.md; then
           sed -i '/^!.*screenshot.png$/d' README.md
         fi
 
+    - name: Update README with new screenshot
+      run: |
         echo '![App Screenshot](assets/screenshot.png)' >> README.md
         
         cat README.md
         
+        git config --global user.name 'github-actions'
+        git config --global user.email 'actions@github.com'
+        
         git add README.md
+        git status
+        git diff --cached
         git commit -m 'Update README with new screenshot'
         git push
