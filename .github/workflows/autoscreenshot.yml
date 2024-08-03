@@ -1,9 +1,6 @@
 name: Take Screenshot and Update README
 
 on:
-  push:
-    branches:
-      - main
   schedule:
     - cron: '0 0 * * *' # Runs daily at midnight, adjust as needed
 
@@ -19,9 +16,6 @@ jobs:
       with:
         rust-version: '1.69' # Use the version you need
 
-    - name: Install dependencies
-      run: cargo build --release
-
     - name: Install tools
       run: |
         sudo apt-get update
@@ -29,15 +23,12 @@ jobs:
 
     - name: Run GUI app and take screenshot
       run: |
-        # Start a virtual display with Xvfb
         Xvfb :99 -screen 0 1280x720x24 &
         export DISPLAY=:99
 
-        # Run the Rust application in the background
         nohup cargo run --release &
         sleep 10 # Give the app some time to start
 
-        # Capture the screenshot
         import -window root assets/screenshot.png
 
     - name: Update README with the new screenshot
@@ -45,23 +36,16 @@ jobs:
         git config --global user.name 'github-actions'
         git config --global user.email 'actions@github.com'
         
-        # Ensure the assets directory exists
         mkdir -p assets
         
-        # Remove old screenshot if it exists
         if grep -q 'screenshot.png' README.md; then
           sed -i '/^!.*screenshot.png$/d' README.md
         fi
 
-        # Add new screenshot
         echo '![App Screenshot](assets/screenshot.png)' >> README.md
         
-        # Check the README file to ensure changes
         cat README.md
         
-        # Commit and push changes
         git add README.md
-        git status
-        git diff --cached
         git commit -m 'Update README with new screenshot'
         git push
