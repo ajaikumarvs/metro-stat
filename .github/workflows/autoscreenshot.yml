@@ -1,0 +1,45 @@
+name: Take Screenshot and Update README
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 0 * * *' # Runs daily at midnight, adjust as needed
+
+jobs:
+  build-and-screenshot:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Rust
+      uses: actions/setup-rust@v1
+      with:
+        rust-version: '1.69' # Use the version you need
+
+    - name: Install dependencies
+      run: cargo build --release
+
+    - name: Install screenshot tool
+      run: sudo apt-get install -y x11-apps
+
+    - name: Run GUI app and take screenshot
+      run: |
+        nohup cargo run --release &
+        sleep 10 # Give the app some time to start
+        import -window root screenshot.png # Adjust the command to capture the GUI window as needed
+
+    - name: Add screenshot to README
+      run: |
+        git config --global user.name 'github-action'
+        git config --global user.email 'actions@github.com'
+        mkdir -p assets
+        mv screenshot.png assets/
+        sed -i '/^!.*screenshot.png$/d' README.md
+        echo '![App Screenshot](assets/screenshot.png)' >> README.md
+        git add README.md
+        git commit -m 'Update README with new screenshot'
+        git push
+
