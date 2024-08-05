@@ -1,4 +1,6 @@
 metro eta ui system
+![vid](https://github.com/user-attachments/assets/bcbd0021-dfb6-49c7-8fe5-891fea522465)
+
 
 provides ETA and destination details
 ![image](https://github.com/user-attachments/assets/05026c97-7127-4f51-9dda-6217c55e0184)
